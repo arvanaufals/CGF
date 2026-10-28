@@ -7,7 +7,7 @@ const char* ssid     = "Wifi_Home2";
 const char* password = "ArvaRais4!";
 
 // Ganti dengan domain Vercel Anda (tanpa https:// dan tanpa / di akhir)
-const char* serverHost = "mist-controller-sepia.vercel.app";
+const char* serverHost = "diffusercgf.vercel.app";
 
 // Harus sama persis dengan Environment Variable DEVICE_KEY di Vercel
 const char* DEVICE_KEY  = "123";
@@ -15,8 +15,8 @@ const char* DEVICE_KEY  = "123";
 
 // Pin Definitions
 const int mosfetPin      = 2;   // D2: MOSFET Diffuser
-const int ledPin1        = 4;   // D4: LED Indikator 1
-const int ledPin2        = 5;   // D5: LED Indikator 2
+const int fanPin        = 4;   // D4: Fan pin
+const int ledPin       = 5;   // D5: LED Indikator
 const int waterSensorPin = 34;  // D34: Sensor Air (Analog)
 
 // Kalibrasi sensor air (sesuaikan nilai raw jika perlu)
@@ -32,8 +32,8 @@ unsigned long lastSync = 0;
 void setOutputs(bool on) {
   diffuserState = on;
   digitalWrite(mosfetPin, on ? HIGH : LOW);
-  digitalWrite(ledPin1,   on ? HIGH : LOW);
-  digitalWrite(ledPin2,   on ? HIGH : LOW);
+  digitalWrite(fanPin,   on ? HIGH : LOW);
+  digitalWrite(ledPin,   on ? HIGH : LOW);
 }
 
 // Baca sensor air (rata-rata 10 sampel agar stabil)
@@ -117,6 +117,7 @@ void syncWithServer() {
     Serial.printf("Air: %d%% | Diffuser: %s\n", percent, diffuserState ? "ON" : "OFF");
   } else {
     Serial.printf("Gagal kirim ke server, kode: %d\n", code);
+    Serial.println(http.getString());   // tampilkan isi balasan
   }
 
   http.end();
@@ -126,8 +127,8 @@ void setup() {
   Serial.begin(115200);
 
   pinMode(mosfetPin, OUTPUT);
-  pinMode(ledPin1, OUTPUT);
-  pinMode(ledPin2, OUTPUT);
+  pinMode(fanPin, OUTPUT);
+  pinMode(ledPin, OUTPUT);
   setOutputs(false);  // default mati
 
   analogReadResolution(12);  // 0 - 4095

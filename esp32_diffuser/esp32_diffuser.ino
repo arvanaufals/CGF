@@ -7,10 +7,10 @@ const char* ssid     = "WIFI GURU KARYAWAN";
 const char* password = "GKalcent2026";
 
 // Ganti dengan domain Vercel Anda (tanpa https:// dan tanpa / di akhir)
-const char* serverHost = "https://diffusercgf.vercel.app/api/device";
+const char* serverHost = "diffusercgf.vercel.app";
 
 // Harus sama persis dengan Environment Variable DEVICE_KEY di Vercel
-const char* deviceKey  = "123";
+const char* DEVICE_KEY  = "123";
 // ===========================================================
 
 // Pin Definitions
@@ -96,7 +96,7 @@ void syncWithServer() {
   }
 
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("x-device-key", deviceKey);
+  http.addHeader("x-device-key", DEVICE_KEY);
 
   String body = "{\"percent\":" + String(percent) +
                 ",\"raw\":" + String(raw) +

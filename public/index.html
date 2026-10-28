@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kontrol Diffuser</title>
+  <style>
+    :root {
+      --bg: #eef3f2;
+      --card: #ffffff;
+      --ink: #17302e;
+      --muted: #5f7774;
+      --water: #2a9d9a;
+      --water-deep: #1c7471;
+      --on: #1f8f55;
+      --off: #c0392b;
+      --warn-bg: #fdecea;
+      --warn-ink: #8a1f14;
+      --line: #dbe5e3;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1a19;
+        --card: #162524;
+        --ink: #e4f0ee;
+        --muted: #8fa9a6;
+        --line: #264240;
+        --warn-bg: #3a1c19;
+        --warn-ink: #f4b4ad;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+    .card {
+      background: var(--card);
+      width: 100%;
+      max-width: 380px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 24px;
+    }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    h1 { font-size: 20px; margin: 0; font-weight: 700; }
+    .badge {
+      font-size: 13px; padding: 4px 10px; border-radius: 999px;
+      border: 1px solid var(--line); color: var(--muted); white-space: nowrap;
+    }
+    .badge::before {
+      content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted); margin-right: 6px;
+    }
+    .badge.online { color: var(--on); border-color: var(--on); }
+    .badge.online::before { background: var(--on); }
+
+    .tank-wrap { display: flex; align-items: center; gap: 22px; margin: 26px 0 8px; }
+    .tank {
+      position: relative; width: 96px; height: 170px; flex: none;
+      border: 3px solid var(--water-deep); border-radius: 12px 12px 22px 22px;
+      overflow: hidden; background: transparent;
+    }
+    .tank .fill {
+      position: absolute; left: 0; right: 0; bottom: 0; height: 0%;
+      background: linear-gradient(180deg, var(--water), var(--water-deep));
+      transition: height .8s ease;
+    }
+    .tank .fill.low { background: var(--off); }
+    .tank .tick { position: absolute; left: 0; width: 14px; height: 2px; background: var(--line); opacity: .9; }
+    .reading .value { font-size: 52px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+    .reading .value small { font-size: 24px; font-weight: 600; margin-left: 2px; }
+    .reading .label { color: var(--muted); font-size: 14px; margin-top: 6px; }
+
+    .alert {
+      display: none; margin: 14px 0 0; padding: 12px 14px; border-radius: 10px;
+      background: var(--warn-bg); color: var(--warn-ink); font-weight: 600; font-size: 14px;
+    }
+    .alert.show { display: block; }
+
+    .btn {
+      width: 100%; margin-top: 20px; padding: 16px; font-size: 18px; font-weight: 700;
+      color: #fff; border: 0; border-radius: 12px; cursor: pointer; transition: background .2s, opacity .2s;
+      background: var(--on);
+    }
+    .btn.is-on { background: var(--off); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn:focus-visible { outline: 3px solid var(--water); outline-offset: 3px; }
+
+    .foot { margin-top: 14px; font-size: 13px; color: var(--muted); min-height: 18px; text-align: center; }
+    @media (prefers-reduced-motion: reduce) { .tank .fill, .btn { transition: none; } }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <header>
+      <h1>Kontrol Diffuser</h1>
+      <span id="conn" class="badge">Menghubungkan…</span>
+    </header>
+
+    <section class="tank-wrap" aria-label="Ketinggian air">
+      <div class="tank">
+        <div id="fill" class="fill"></div>
+        <span class="tick" style="bottom:25%"></span>
+        <span class="tick" style="bottom:50%"></span>
+        <span class="tick" style="bottom:75%"></span>
+      </div>
+      <div class="reading">
+        <div class="value"><span id="waterVal">--</span><small>%</small></div>
+        <div class="label">Ketinggian air</div>
+      </div>
+    </section>
+
+    <div id="waterAlert" class="alert" role="alert">
+      Air kurang dari 10%. Diffuser dimatikan otomatis.
+    </div>
+
+    <button id="toggleBtn" class="btn" disabled>Nyalakan diffuser</button>
+    <div id="msg" class="foot" aria-live="polite"></div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let busy = false;
+    let online = false;
+    let lowWater = false;
+
+    function render(d) {
+      online = d.online;
+      lowWater = d.percent < 10;
+
+      const conn = $("conn");
+      conn.textContent = d.online ? "Perangkat online" : "Perangkat offline";
+      conn.className = "badge" + (d.online ? " online" : "");
+
+      $("waterVal").textContent = d.percent;
+      $("fill").style.height = d.percent + "%";
+      $("fill").classList.toggle("low", lowWater);
+      $("waterAlert").classList.toggle("show", d.online && lowWater);
+
+      const btn = $("toggleBtn");
+      btn.textContent = d.diffuser ? "Matikan diffuser" : "Nyalakan diffuser";
+      btn.classList.toggle("is-on", d.diffuser);
+      btn.disabled = busy || !d.online || (lowWater && !d.diffuser);
+
+      if (!busy) {
+        if (!d.online) setMsg("Menunggu ESP32 terhubung ke internet.");
+        else if (d.diffuser !== d.reported) setMsg("Mengirim perintah ke perangkat…");
+        else setMsg("");
+      }
+    }
+
+    function setMsg(t) { $("msg").textContent = t; }
+
+    async function refresh() {
+      try {
+        const r = await fetch("/api/status", { cache: "no-store" });
+        if (!r.ok) throw new Error();
+        render(await r.json());
+      } catch {
+        $("conn").textContent = "Server tidak terjangkau";
+        $("conn").className = "badge";
+        $("toggleBtn").disabled = true;
+      }
+    }
+
+    $("toggleBtn").addEventListener("click", async () => {
+      busy = true;
+      $("toggleBtn").disabled = true;
+      try {
+        const r = await fetch("/api/toggle", { method: "POST" });
+        const d = await r.json();
+        if (!r.ok) setMsg(d.error || "Gagal mengirim perintah.");
+      } catch {
+        setMsg("Gagal menghubungi server.");
+      }
+      busy = false;
+      refresh();
+    });
+
+    refresh();
+    setInterval(refresh, 2000);
+  </script>
+</body>
+</html>

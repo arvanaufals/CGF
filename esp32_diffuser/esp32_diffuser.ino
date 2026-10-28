@@ -1,0 +1,145 @@
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+
+// ======================= KONFIGURASI =======================
+const char* ssid     = "NAMA_WIFI_ANDA";
+const char* password = "PASSWORD_WIFI_ANDA";
+
+// Ganti dengan domain Vercel Anda (tanpa https:// dan tanpa / di akhir)
+const char* serverHost = "NAMA-PROJECT-ANDA.vercel.app";
+
+// Harus sama persis dengan Environment Variable DEVICE_KEY di Vercel
+const char* deviceKey  = "GANTI_DENGAN_KUNCI_RAHASIA";
+// ===========================================================
+
+// Pin Definitions
+const int mosfetPin      = 2;   // D2: MOSFET Diffuser
+const int ledPin1        = 4;   // D4: LED Indikator 1
+const int ledPin2        = 5;   // D5: LED Indikator 2
+const int waterSensorPin = 34;  // D34: Sensor Air (Analog)
+
+// Kalibrasi sensor air (sesuaikan nilai raw jika perlu)
+const int rawAirKering = 0;
+const int rawAirPenuh  = 3000;
+
+const int  minWaterPercent = 10;           // di bawah ini diffuser dipaksa OFF
+const unsigned long syncInterval = 2000;   // kirim data / ambil perintah tiap 2 detik
+
+bool diffuserState = false;
+unsigned long lastSync = 0;
+
+void setOutputs(bool on) {
+  diffuserState = on;
+  digitalWrite(mosfetPin, on ? HIGH : LOW);
+  digitalWrite(ledPin1,   on ? HIGH : LOW);
+  digitalWrite(ledPin2,   on ? HIGH : LOW);
+}
+
+// Baca sensor air (rata-rata 10 sampel agar stabil)
+void readWater(int &raw, int &percent) {
+  long sum = 0;
+  for (int i = 0; i < 10; i++) {
+    sum += analogRead(waterSensorPin);
+    delay(2);
+  }
+  raw = sum / 10;
+  percent = constrain(map(raw, rawAirKering, rawAirPenuh, 0, 100), 0, 100);
+}
+
+void connectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+
+  Serial.print("Menghubungkan ke WiFi: ");
+  Serial.println(ssid);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi Terhubung!");
+    Serial.print("IP: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\nGagal terhubung, mencoba lagi nanti.");
+  }
+}
+
+// Kirim status ke server, terima perintah diffuser terbaru
+void syncWithServer() {
+  int raw, percent;
+  readWater(raw, percent);
+
+  // Pengaman lokal: tetap berjalan walau internet putus
+  if (percent < minWaterPercent && diffuserState) {
+    setOutputs(false);
+    Serial.println("Air < 10%, diffuser dimatikan otomatis.");
+  }
+
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  WiFiClientSecure client;
+  client.setInsecure();  // lewati verifikasi sertifikat (sederhana). Lihat README untuk opsi lebih aman.
+
+  HTTPClient http;
+  http.setTimeout(6000);
+  String url = String("https://") + serverHost + "/api/device";
+
+  if (!http.begin(client, url)) {
+    Serial.println("http.begin gagal");
+    return;
+  }
+
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("x-device-key", deviceKey);
+
+  String body = "{\"percent\":" + String(percent) +
+                ",\"raw\":" + String(raw) +
+                ",\"diffuser\":" + (diffuserState ? "true" : "false") + "}";
+
+  int code = http.POST(body);
+
+  if (code == 200) {
+    String res = http.getString();
+    bool wantOn = res.indexOf("\"diffuser\":true") >= 0;
+
+    // Terapkan perintah, tapi jangan nyalakan jika air kurang
+    if (wantOn && percent < minWaterPercent) wantOn = false;
+    if (wantOn != diffuserState) {
+      setOutputs(wantOn);
+      Serial.println(wantOn ? "Diffuser ON (dari website)" : "Diffuser OFF (dari website)");
+    }
+    Serial.printf("Air: %d%% | Diffuser: %s\n", percent, diffuserState ? "ON" : "OFF");
+  } else {
+    Serial.printf("Gagal kirim ke server, kode: %d\n", code);
+  }
+
+  http.end();
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(mosfetPin, OUTPUT);
+  pinMode(ledPin1, OUTPUT);
+  pinMode(ledPin2, OUTPUT);
+  setOutputs(false);  // default mati
+
+  analogReadResolution(12);  // 0 - 4095
+
+  connectWiFi();
+}
+
+void loop() {
+  connectWiFi();  // otomatis sambung ulang jika terputus
+
+  if (millis() - lastSync >= syncInterval) {
+    lastSync = millis();
+    syncWithServer();
+  }
+}

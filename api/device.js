@@ -1,5 +1,3 @@
-// Dipanggil oleh ESP32: lapor sensor + ambil perintah terbaru.
-// POST /api/device   header: x-device-key   body: {"percent":55,"raw":1800,"diffuser":true}
 const { getState, saveState, MIN_WATER_PERCENT } = require("./_store");
 
 module.exports = async (req, res) => {
@@ -9,7 +7,6 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Pengecekan kunci dengan pesan error yang jelas (untuk debugging)
   const serverKey = (process.env.DEVICE_KEY || "").trim();
   const sentKey = String(req.headers["x-device-key"] || "").trim();
 
@@ -18,15 +15,13 @@ module.exports = async (req, res) => {
       error: "DEVICE_KEY belum terbaca di server (cek Environment Variables lalu Redeploy)",
     });
   }
+
   if (!sentKey) {
     return res.status(401).json({ error: "Header x-device-key tidak terkirim" });
   }
+
   if (sentKey !== serverKey) {
-    return res.status(401).json({
-      error: "Kunci tidak cocok",
-      panjangDikirim: sentKey.length,
-      panjangDiServer: serverKey.length,
-    });
+    return res.status(401).json({ error: "Kunci tidak cocok" });
   }
 
   try {
@@ -41,7 +36,7 @@ module.exports = async (req, res) => {
     state.reported = reported;
     state.lastSeen = Date.now();
 
-    // Pengaman: air < 10% -> perintah dipaksa OFF
+    // Pengaman: Air < 10% -> Perintah dipaksa OFF
     if (percent < MIN_WATER_PERCENT) state.desired = false;
 
     await saveState(state);

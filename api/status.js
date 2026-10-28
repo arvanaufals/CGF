@@ -1,6 +1,4 @@
-// Dipanggil oleh website: baca status terbaru.
-// GET /api/status
-const { getState, isOnline } = require("./_store");
+onst { getState, isOnline } = require("./_store");
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
@@ -20,6 +18,6 @@ module.exports = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error", detail: String(err.message || err) });
   }
 };

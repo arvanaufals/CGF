@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kontrol Mist Maker ESP32</title>
+  <style>
+    body { font-family: 'Segoe UI', Roboto, sans-serif; text-align: center; margin: 0; padding: 30px 12px; background: #f0f2f5; color: #333; }
+    .card { background: #fff; padding: 25px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,.1); width: 320px; max-width: 100%; box-sizing: border-box; }
+    .btn { padding: 15px 30px; font-size: 18px; font-weight: bold; color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: .3s; width: 80%; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-on { background: #28a745; }
+    .btn-off { background: #dc3545; }
+    .sensor-display { font-size: 36px; font-weight: bold; color: #007bff; margin: 10px 0; }
+    .bar { height: 12px; background: #e9ecef; border-radius: 6px; overflow: hidden; }
+    .bar > div { height: 100%; width: 0; background: #007bff; transition: width .5s; }
+    .warning { color: #dc3545; font-weight: bold; margin-top: 12px; display: none; }
+    .chip { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #fff; background: #6c757d; }
+    .chip.online { background: #28a745; }
+    .chip.offline { background: #dc3545; }
+    .note { font-size: 13px; color: #888; margin-top: 8px; min-height: 18px; }
+    hr { border: 0; height: 1px; background: #eee; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>ESP32 Mist Controller</h2>
+    <span id="chip" class="chip">Memuat...</span>
+    <hr>
+
+    <h3>Status Mist Maker</h3>
+    <button id="toggleBtn" class="btn btn-on" onclick="toggleMist()" disabled>Memuat...</button>
+    <div id="note" class="note"></div>
+    <hr>
+
+    <h3>Level Air</h3>
+    <div class="sensor-display"><span id="waterVal">--</span>%</div>
+    <div class="bar"><div id="bar"></div></div>
+    <div id="warn" class="warning">⚠ Air hampir habis! Mist maker dimatikan otomatis.</div>
+  </div>
+
+<script>
+  let desired = false;
+  let busy = false;
+
+  function getPass() {
+    let p = null;
+    try { p = localStorage.getItem('mistPass'); } catch (e) {}
+    if (!p) {
+      p = prompt('Masukkan password kontrol:');
+      if (p) { try { localStorage.setItem('mistPass', p); } catch (e) {} }
+    }
+    return p;
+  }
+
+  async function refresh() {
+    try {
+      const r = await fetch('/api/state', { cache: 'no-store' });
+      const s = await r.json();
+      desired = s.desired;
+
+      document.getElementById('waterVal').textContent = s.water;
+      document.getElementById('bar').style.width = s.water + '%';
+      document.getElementById('warn').style.display = s.lowWater ? 'block' : 'none';
+
+      const chip = document.getElementById('chip');
+      chip.textContent = s.online ? 'Perangkat Online' : 'Perangkat Offline';
+      chip.className = 'chip ' + (s.online ? 'online' : 'offline');
+
+      const btn = document.getElementById('toggleBtn');
+      btn.disabled = !s.online || busy;
+      if (s.desired) { btn.textContent = 'MATIKAN (OFF)'; btn.className = 'btn btn-off'; }
+      else { btn.textContent = 'NYALAKAN (ON)'; btn.className = 'btn btn-on'; }
+
+      document.getElementById('note').textContent =
+        !s.online ? 'ESP32 tidak terhubung' :
+        (s.desired !== s.actual ? 'Menunggu perangkat merespons...' : '');
+    } catch (e) {
+      document.getElementById('chip').textContent = 'Gagal memuat';
+    }
+  }
+
+  async function toggleMist() {
+    const pass = getPass();
+    if (!pass) return;
+    busy = true;
+    document.getElementById('toggleBtn').disabled = true;
+    try {
+      const r = await fetch('/api/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-password': pass },
+        body: JSON.stringify({ state: !desired })
+      });
+      if (r.status === 401) {
+        try { localStorage.removeItem('mistPass'); } catch (e) {}
+        alert('Password salah');
+      } else if (!r.ok) {
+        const d = await r.json();
+        alert(d.error || 'Gagal');
+      }
+    } catch (e) { alert('Koneksi gagal'); }
+    busy = false;
+    refresh();
+  }
+
+  refresh();
+  setInterval(refresh, 2000);
+</script>
+</body>
+</html>

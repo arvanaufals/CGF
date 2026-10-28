@@ -8,8 +8,25 @@ module.exports = async (req, res) => {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  if (!process.env.DEVICE_KEY || req.headers["x-device-key"] !== process.env.DEVICE_KEY) {
-    return res.status(401).json({ error: "Unauthorized" });
+
+  // Pengecekan kunci dengan pesan error yang jelas (untuk debugging)
+  const serverKey = (process.env.DEVICE_KEY || "").trim();
+  const sentKey = String(req.headers["x-device-key"] || "").trim();
+
+  if (!serverKey) {
+    return res.status(401).json({
+      error: "DEVICE_KEY belum terbaca di server (cek Environment Variables lalu Redeploy)",
+    });
+  }
+  if (!sentKey) {
+    return res.status(401).json({ error: "Header x-device-key tidak terkirim" });
+  }
+  if (sentKey !== serverKey) {
+    return res.status(401).json({
+      error: "Kunci tidak cocok",
+      panjangDikirim: sentKey.length,
+      panjangDiServer: serverKey.length,
+    });
   }
 
   try {
@@ -31,6 +48,6 @@ module.exports = async (req, res) => {
     return res.status(200).json({ diffuser: state.desired });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error", detail: String(err.message || err) });
   }
 };

@@ -3,28 +3,25 @@
 #include <HTTPClient.h>
 
 // ======================= KONFIGURASI =======================
-const char* ssid     = "Wifi_Home2";
-const char* password = "ArvaRais4!";
+const char* ssid       = "Wifi_Home2";
+const char* password   = "ArvaRais4!";
 
-// Ganti dengan domain Vercel Anda (tanpa https:// dan tanpa / di akhir)
+// Server domain (tanpa https:// dan tanpa / di akhir)
 const char* serverHost = "diffusercgf.vercel.app";
 
 // Harus sama persis dengan Environment Variable DEVICE_KEY di Vercel
 const char* DEVICE_KEY  = "123";
 // ===========================================================
 
-// Pin Definitions
 const int mosfetPin      = 2;   // D2: MOSFET Diffuser
-const int fanPin        = 4;   // D4: Fan pin
-const int ledPin       = 5;   // D5: LED Indikator
+const int ledPin1        = 4;   // D4: LED Indikator 1
+const int ledPin2        = 5;   // D5: LED Indikator 2
 const int waterSensorPin = 34;  // D34: Sensor Air (Analog)
 
-// Kalibrasi sensor air (sesuaikan nilai raw jika perlu)
 const int rawAirKering = 0;
 const int rawAirPenuh  = 3000;
-
-const int  minWaterPercent = 10;           // di bawah ini diffuser dipaksa OFF
-const unsigned long syncInterval = 2000;   // kirim data / ambil perintah tiap 2 detik
+const int minWaterPercent = 10;
+const unsigned long syncInterval = 2000;
 
 bool diffuserState = false;
 unsigned long lastSync = 0;
@@ -32,11 +29,10 @@ unsigned long lastSync = 0;
 void setOutputs(bool on) {
   diffuserState = on;
   digitalWrite(mosfetPin, on ? HIGH : LOW);
-  digitalWrite(fanPin,   on ? HIGH : LOW);
-  digitalWrite(ledPin,   on ? HIGH : LOW);
+  digitalWrite(ledPin1,   on ? HIGH : LOW);
+  digitalWrite(ledPin2,   on ? HIGH : LOW);
 }
 
-// Baca sensor air (rata-rata 10 sampel agar stabil)
 void readWater(int &raw, int &percent) {
   long sum = 0;
   for (int i = 0; i < 10; i++) {
@@ -49,7 +45,6 @@ void readWater(int &raw, int &percent) {
 
 void connectWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
-
   Serial.print("Menghubungkan ke WiFi: ");
   Serial.println(ssid);
   WiFi.mode(WIFI_STA);
@@ -70,12 +65,10 @@ void connectWiFi() {
   }
 }
 
-// Kirim status ke server, terima perintah diffuser terbaru
 void syncWithServer() {
   int raw, percent;
   readWater(raw, percent);
 
-  // Pengaman lokal: tetap berjalan walau internet putus
   if (percent < minWaterPercent && diffuserState) {
     setOutputs(false);
     Serial.println("Air < 10%, diffuser dimatikan otomatis.");
@@ -84,12 +77,12 @@ void syncWithServer() {
   if (WiFi.status() != WL_CONNECTED) return;
 
   WiFiClientSecure client;
-  client.setInsecure();  // lewati verifikasi sertifikat (sederhana). Lihat README untuk opsi lebih aman.
+  client.setInsecure();
 
   HTTPClient http;
   http.setTimeout(6000);
-  String url = String("https://") + serverHost + "/api/device";
 
+  String url = String("https://") + serverHost + "/api/device";
   if (!http.begin(client, url)) {
     Serial.println("http.begin gagal");
     return;
@@ -108,7 +101,6 @@ void syncWithServer() {
     String res = http.getString();
     bool wantOn = res.indexOf("\"diffuser\":true") >= 0;
 
-    // Terapkan perintah, tapi jangan nyalakan jika air kurang
     if (wantOn && percent < minWaterPercent) wantOn = false;
     if (wantOn != diffuserState) {
       setOutputs(wantOn);
@@ -117,28 +109,22 @@ void syncWithServer() {
     Serial.printf("Air: %d%% | Diffuser: %s\n", percent, diffuserState ? "ON" : "OFF");
   } else {
     Serial.printf("Gagal kirim ke server, kode: %d\n", code);
-    Serial.println(http.getString());   // tampilkan isi balasan
   }
-
   http.end();
 }
 
 void setup() {
   Serial.begin(115200);
-
   pinMode(mosfetPin, OUTPUT);
-  pinMode(fanPin, OUTPUT);
-  pinMode(ledPin, OUTPUT);
-  setOutputs(false);  // default mati
-
-  analogReadResolution(12);  // 0 - 4095
-
+  pinMode(ledPin1, OUTPUT);
+  pinMode(ledPin2, OUTPUT);
+  setOutputs(false);
+  analogReadResolution(12);
   connectWiFi();
 }
 
 void loop() {
-  connectWiFi();  // otomatis sambung ulang jika terputus
-
+  connectWiFi();
   if (millis() - lastSync >= syncInterval) {
     lastSync = millis();
     syncWithServer();

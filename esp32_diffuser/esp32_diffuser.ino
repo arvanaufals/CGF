@@ -7,7 +7,7 @@ const char* ssid     = "WIFI GURU KARYAWAN";
 const char* password = "GKalcent2026";
 
 // Ganti dengan domain Vercel Anda (tanpa https:// dan tanpa / di akhir)
-const char* serverHost = "https://diffusercgf.vercel.app";
+const char* serverHost = "https://diffusercgf.vercel.app/api/device";
 
 // Harus sama persis dengan Environment Variable DEVICE_KEY di Vercel
 const char* deviceKey  = "123";

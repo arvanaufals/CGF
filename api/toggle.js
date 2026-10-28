@@ -1,5 +1,3 @@
-// Dipanggil oleh website: nyalakan / matikan diffuser.
-// POST /api/toggle
 const { getState, saveState, isOnline, MIN_WATER_PERCENT } = require("./_store");
 
 module.exports = async (req, res) => {
@@ -30,6 +28,6 @@ module.exports = async (req, res) => {
     return res.status(200).json({ diffuser: s.desired });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error", detail: String(err.message || err) });
   }
 };

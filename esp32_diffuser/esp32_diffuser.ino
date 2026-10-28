@@ -3,14 +3,14 @@
 #include <HTTPClient.h>
 
 // ======================= KONFIGURASI =======================
-const char* ssid     = "NAMA_WIFI_ANDA";
-const char* password = "PASSWORD_WIFI_ANDA";
+const char* ssid     = "WIFI GURU KARYAWAN";
+const char* password = "GKalcent2026";
 
 // Ganti dengan domain Vercel Anda (tanpa https:// dan tanpa / di akhir)
-const char* serverHost = "NAMA-PROJECT-ANDA.vercel.app";
+const char* serverHost = "https://diffusercgf.vercel.app";
 
 // Harus sama persis dengan Environment Variable DEVICE_KEY di Vercel
-const char* deviceKey  = "GANTI_DENGAN_KUNCI_RAHASIA";
+const char* deviceKey  = "123";
 // ===========================================================
 
 // Pin Definitions

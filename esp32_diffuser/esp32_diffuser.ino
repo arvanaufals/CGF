@@ -3,8 +3,8 @@
 #include <HTTPClient.h>
 
 // ======================= KONFIGURASI =======================
-const char* ssid       = "Wifi_Home2";
-const char* password   = "ArvaRais4!";
+const char* ssid       = "SMA-SISWA";
+const char* password   = "alcent2026";
 
 // Server domain (tanpa https:// dan tanpa / di akhir)
 const char* serverHost = "diffusercgf.vercel.app";
